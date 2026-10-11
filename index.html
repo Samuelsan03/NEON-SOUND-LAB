@@ -1454,6 +1454,7 @@ function applyPreset(name) {
   }
 
   updateUI();
+  updateOutputInfo();   // ✅ AGREGADO — refresca el Output en tiempo real
   
   if (isPlaying) {
     const elapsed = (audioContext.currentTime - startTime) * oldSpeed;
