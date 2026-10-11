@@ -1453,8 +1453,8 @@ function applyPreset(name) {
     speedSlider.value = Math.round(p.speed * 100);
   }
 
-  updateUI();
-  updateOutputInfo();   // ✅ AGREGADO — refresca el Output en tiempo real
+  // ✅ CENTRALIZADO: actualiza UI, Output, reverb y presets de una vez
+  refreshAllDisplays();
   
   if (isPlaying) {
     const elapsed = (audioContext.currentTime - startTime) * oldSpeed;
@@ -1464,48 +1464,44 @@ function applyPreset(name) {
       sourceNode.detune.value = getTotalDetune();
     }
   }
-  
-  updateReverbGains();
-  checkPresetMatch();
 }
 
 // ============ SLIDERS INDIVIDUALES ============
+
 speedSlider.addEventListener('input', (e) => {
   const newSpeed = parseInt(e.target.value) / 100;
   const oldSpeed = state.speed;
   state.speed = newSpeed;
-  
+
   if (isPlaying) {
     const elapsed = (audioContext.currentTime - startTime) * oldSpeed;
     startTime = audioContext.currentTime - elapsed / newSpeed;
     if (sourceNode) sourceNode.playbackRate.value = newSpeed;
   }
-  
-  speedValueEl.textContent = newSpeed.toFixed(2) + 'x';
-  updateOutputInfo();
-  checkPresetMatch();
+
+  refreshAllDisplays();
 });
 
 reverbSlider.addEventListener('input', (e) => {
   state.reverb = parseInt(e.target.value) / 100;
-  reverbValueEl.textContent = e.target.value + '%';
-  updateReverbGains();
-  checkPresetMatch();
+
+  refreshAllDisplays();
 });
 
 pitchSlider.addEventListener('input', (e) => {
   state.pitch = parseInt(e.target.value);
-  pitchValueEl.textContent = (state.pitch >= 0 ? '+' : '') + state.pitch + ' st';
+
   if (sourceNode) sourceNode.detune.value = getTotalDetune();
-  updateOutputInfo();
-  checkPresetMatch();
+
+  refreshAllDisplays();
 });
 
 hz432Slider.addEventListener('input', (e) => {
   state.hz432 = parseInt(e.target.value) / 100;
-  hz432ValueEl.textContent = e.target.value + '%';
+
   if (sourceNode) sourceNode.detune.value = getTotalDetune();
-  updateOutputInfo();
+
+  refreshAllDisplays();
 });
 
 function updateUI() {
@@ -1515,21 +1511,35 @@ function updateUI() {
   hz432ValueEl.textContent = Math.round(state.hz432 * 100) + '%';
 }
 
+// ============ ACTUALIZACIÓN CENTRALIZADA ============
+
+function refreshAllDisplays() {
+  updateUI();
+  updateOutputInfo();
+  updateReverbGains();
+  checkPresetMatch();
+}
+
 function checkPresetMatch() {
   let matched = null;
-  
-  if (Math.abs(state.speed - 1.0) < 0.01 && state.reverb < 0.01 && state.pitch === 0) {
+
+  if (
+    Math.abs(state.speed - 1.0) < 0.01 &&
+    state.reverb < 0.01 &&
+    state.pitch === 0
+  ) {
     matched = 'normal';
   } else {
     for (const [name, p] of Object.entries(presets)) {
       if (name === 'normal') continue;
+
       if (Math.abs(p.speed - state.speed) < 0.01) {
         matched = name;
         break;
       }
     }
   }
-  
+
   document.querySelectorAll('.fx-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.preset === matched);
   });
