@@ -134,6 +134,76 @@ input[type="range"].slider-green::-moz-range-thumb {
   box-shadow: 0 0 15px rgba(74, 222, 128, 0.8);
 }
 
+/* ============ TOGGLE 285Hz (interruptor) ============ */
+:root {
+  --neon-rose: #fb7185;
+  --neon-rose-glow: rgba(251, 113, 133, 0.8);
+  --neon-violet: #a855f7;
+}
+.neon-rose { color: var(--neon-rose); text-shadow: 0 0 10px rgba(251, 113, 133, 0.6), 0 0 25px rgba(251, 113, 133, 0.3); }
+
+.toggle-switch {
+  position: relative;
+  width: 64px;
+  height: 32px;
+  background: rgba(20, 5, 40, 0.8);
+  border: 1px solid rgba(131, 56, 236, 0.4);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+.toggle-switch:hover { border-color: rgba(251, 113, 133, 0.5); }
+.toggle-switch .toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.toggle-switch.active {
+  background: linear-gradient(135deg, rgba(251, 113, 133, 0.25), rgba(168, 85, 247, 0.15));
+  border-color: var(--neon-rose);
+  box-shadow: 0 0 25px rgba(251, 113, 133, 0.5), inset 0 0 12px rgba(251, 113, 133, 0.18);
+}
+.toggle-switch.active .toggle-knob {
+  left: 37px;
+  background: linear-gradient(135deg, var(--neon-rose), var(--neon-violet));
+  box-shadow: 0 0 15px var(--neon-rose-glow), 0 0 4px #fff, inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.toggle-switch.active::before {
+  content: '';
+  position: absolute;
+  bottom: -2px; left: 0;
+  width: 100%; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--neon-rose), var(--neon-violet), transparent);
+  animation: scan 2s infinite;
+  border-radius: 999px;
+}
+.toggle-status {
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(251, 113, 133, 0.35);
+  color: rgba(251, 113, 133, 0.7);
+  background: rgba(251, 113, 133, 0.06);
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+.toggle-status.on {
+  color: var(--neon-rose);
+  background: rgba(251, 113, 133, 0.15);
+  border-color: var(--neon-rose);
+  text-shadow: 0 0 10px rgba(251, 113, 133, 0.6);
+}
+
 .export-btn {
   background: linear-gradient(135deg, rgba(0, 245, 255, 0.08), rgba(131, 56, 236, 0.04));
   border: 1px solid rgba(0, 245, 255, 0.3);
@@ -516,6 +586,35 @@ select:focus { border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(0, 245,
           </div>
         </div>
 
+        <!-- 285Hz TOGGLE (Solfeggio - interruptor) -->
+        <div class="slider-row" style="border-color: rgba(251, 113, 133, 0.18);">
+          <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: rgba(251, 113, 133, 0.18);">
+                <svg class="w-4 h-4" style="color: var(--neon-rose);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v16h4V8h4v12h4V4H4zm12 0v8h4v8"/>
+                </svg>
+              </div>
+              <div class="flex-1 min-w-[180px]">
+                <div class="text-sm font-medium text-white flex items-center gap-2 flex-wrap">
+                  <span data-i18n="hz285_title">Re-afinación 285Hz (Solfeggio)</span>
+                  <span class="tag px-1.5 py-0.5 rounded" style="background:rgba(251,113,133,.15);border-color:rgba(251,113,133,.4);color:var(--neon-rose);">SOLFEGGIO</span>
+                </div>
+                <div class="text-xs text-purple-200/50" data-i18n="hz285_desc">Re-afina a C#4=285Hz · A4=452.41Hz · +48.15 cents — proceso instantáneo ON/OFF (a diferencia del slider 432Hz)</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span id="hz285Status" class="toggle-status">OFF</span>
+              <div id="hz285Toggle" class="toggle-switch" role="switch" aria-checked="false" tabindex="0">
+                <div class="toggle-knob"></div>
+              </div>
+            </div>
+          </div>
+          <div class="flex justify-between text-xs text-purple-200/40 mt-2 px-1">
+            <span data-i18n="hz285_help_off">Click en el interruptor para activar la re-afinación Solfeggio</span>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -614,6 +713,11 @@ const i18n = {
     pitch_desc: "Sube o baja el tono sin cambiar la velocidad",
     hz432_title: "Afinación 432Hz",
     hz432_desc: "Baja la afinación estándar a 432Hz (más suave y relajante)",
+    hz285_title: "Re-afinación 285Hz (Solfeggio)",
+    hz285_desc: "Re-afina a C#4=285Hz · A4=452.41Hz · +48.15 cents — proceso instantáneo ON/OFF (a diferencia del slider 432Hz)",
+    hz285_on: "ON",
+    hz285_off: "OFF",
+    hz285_help_off: "Click en el interruptor para activar la re-afinación Solfeggio",
     export_title: "EXPORTAR",
     export_desc: "aplica los efectos actuales y descarga",
     output_label: "Output",
@@ -667,6 +771,11 @@ const i18n = {
     pitch_desc: "Raise or lower the pitch without changing speed",
     hz432_title: "432Hz Tuning",
     hz432_desc: "Lower standard tuning to 432Hz (smoother and relaxing)",
+    hz285_title: "285Hz Retune (Solfeggio)",
+    hz285_desc: "Retunes to C#4=285Hz · A4=452.41Hz · +48.15 cents — instant ON/OFF (unlike the 432Hz slider)",
+    hz285_on: "ON",
+    hz285_off: "OFF",
+    hz285_help_off: "Click the switch to activate the Solfeggio retune",
     export_title: "EXPORT",
     export_desc: "apply current effects and download",
     output_label: "Output",
@@ -720,6 +829,11 @@ const i18n = {
     pitch_desc: "在不改变速度的情况下升高或降低音调",
     hz432_title: "432Hz 调音",
     hz432_desc: "将标准调音降至432Hz (更平滑放松)",
+    hz285_title: "285Hz 重新调音 (Solfeggio)",
+    hz285_desc: "重新调音至 C#4=285Hz · A4=452.41Hz · +48.15 音分 — 即时 ON/OFF (不同于 432Hz 滑块)",
+    hz285_on: "开",
+    hz285_off: "关",
+    hz285_help_off: "点击开关以激活 Solfeggio 重新调音",
     export_title: "导出",
     export_desc: "应用当前效果并下载",
     output_label: "输出",
@@ -773,6 +887,11 @@ const i18n = {
     pitch_desc: "速度を変えずにピッチを上下",
     hz432_title: "432Hz チューニング",
     hz432_desc: "標準チューニングを432Hzに下げる (滑らかでリラックス)",
+    hz285_title: "285Hz 再チューニング (Solfeggio)",
+    hz285_desc: "C#4=285Hz · A4=452.41Hz · +48.15セントに再チューニング — 即時 ON/OFF (432Hzスライダーとは異なる)",
+    hz285_on: "オン",
+    hz285_off: "オフ",
+    hz285_help_off: "スイッチをクリックしてSolfeggio再チューニングを有効化",
     export_title: "エクスポート",
     export_desc: "現在のエフェクトを適用してダウンロード",
     output_label: "出力",
@@ -826,6 +945,11 @@ const i18n = {
     pitch_desc: "속도 변경 없이 피치 업/다운",
     hz432_title: "432Hz 튜닝",
     hz432_desc: "표준 튜닝을 432Hz로 낮춤 (부드럽고 편안함)",
+    hz285_title: "285Hz 재튜닝 (Solfeggio)",
+    hz285_desc: "C#4=285Hz · A4=452.41Hz · +48.15센트로 재튜닝 — 즉시 ON/OFF (432Hz 슬라이더와 다름)",
+    hz285_on: "켜짐",
+    hz285_off: "꺼짐",
+    hz285_help_off: "스위치를 클릭하여 Solfeggio 재튜닝 활성화",
     export_title: "내보내기",
     export_desc: "현재 효과 적용 및 다운로드",
     output_label: "출력",
@@ -899,6 +1023,11 @@ function setLanguage(lang) {
   } else {
     document.getElementById('oggStatus').textContent = t('ogg_desc_unavail');
   }
+  
+  // Refresca el estado del toggle 285Hz con la traducción correcta
+  if (typeof hz285StatusEl !== 'undefined' && hz285StatusEl) {
+    hz285StatusEl.textContent = state.hz285 ? t('hz285_on') : t('hz285_off');
+  }
 }
 
 document.getElementById('langSelect').addEventListener('change', (e) => {
@@ -927,7 +1056,14 @@ const state = {
   reverb: 0.0,
   pitch: 0,
   hz432: 0.0, // 0 to 1
+  hz285: false, // toggle ON/OFF (Solfeggio 285Hz retune, +48.15 cents)
 };
+
+// 285Hz Solfeggio retune: C#4 = 285Hz → A4 = 285 * 2^(8/12) = 452.41Hz
+// Shift from A4=440Hz to A4=452.41Hz = 1200 * log2(452.41/440) ≈ +48.15 cents (UP)
+const HZ_285_CENTS = 48.15;
+// 432Hz: -31.76665 cents (already implemented, kept for reference)
+const HZ_432_CENTS = -31.76665;
 
 const presets = {
   normal:    { speed: 1.00 },
@@ -953,6 +1089,8 @@ const pitchSlider = document.getElementById('pitchSlider');
 const pitchValueEl = document.getElementById('pitchValue');
 const hz432Slider = document.getElementById('hz432Slider');
 const hz432ValueEl = document.getElementById('hz432Value');
+const hz285Toggle = document.getElementById('hz285Toggle');
+const hz285StatusEl = document.getElementById('hz285Status');
 const waveformCanvas = document.getElementById('waveformCanvas');
 const spectrumCanvas = document.getElementById('spectrumCanvas');
 const waveformScan = document.getElementById('waveformScan');
@@ -1049,6 +1187,7 @@ async function loadFile(file) {
     state.reverb = 0.0;
     state.pitch = 0;
     state.hz432 = 0.0;
+    state.hz285 = false;
     speedSlider.value = 100;
     reverbSlider.value = 0;
     pitchSlider.value = 0;
@@ -1074,8 +1213,12 @@ async function loadFile(file) {
 
 // ============ GRAFO AUDIO ============
 function getTotalDetune() {
-  // 432Hz is -31.76665 cents relative to 440Hz
-  return state.pitch * 100 + (state.hz432 * -31.76665);
+  // 432Hz is -31.76665 cents relative to 440Hz (progressive mix via slider 0..1)
+  // 285Hz Solfeggio is +48.15 cents relative to 440Hz (instant ON/OFF toggle)
+  // Both can stack with manual pitch (semitones) independently.
+  const hz432Component = state.hz432 * HZ_432_CENTS;
+  const hz285Component = state.hz285 ? HZ_285_CENTS : 0;
+  return state.pitch * 100 + hz432Component + hz285Component;
 }
 
 function setupAudioGraph() {
@@ -1149,7 +1292,14 @@ function updateOutputInfo() {
   if (!audioBuffer) return;
   const outDuration = audioBuffer.duration / state.speed;
   const speedPct = Math.round(state.speed * 100);
-  outputInfo.textContent = `${formatTime(outDuration)} · ${speedPct}% spd · ${state.pitch >= 0 ? '+' : ''}${state.pitch}st · ${Math.round(state.hz432 * 100)}% 432Hz`;
+  const parts = [
+    formatTime(outDuration),
+    `${speedPct}% spd`,
+    `${state.pitch >= 0 ? '+' : ''}${state.pitch}st`,
+    `${Math.round(state.hz432 * 100)}% 432Hz`
+  ];
+  if (state.hz285) parts.push('285Hz ON');
+  outputInfo.textContent = parts.join(' · ');
 }
 
 // ============ PLAYBACK ============
@@ -1445,6 +1595,7 @@ function applyPreset(name) {
     state.reverb = 0.0;
     state.pitch = 0;
     state.hz432 = 0.0;
+    state.hz285 = false;
     speedSlider.value = 100;
     reverbSlider.value = 0;
     pitchSlider.value = 0;
@@ -1505,11 +1656,48 @@ hz432Slider.addEventListener('input', (e) => {
   refreshAllDisplays();
 });
 
+// ============ TOGGLE 285Hz (Solfeggio - interruptor ON/OFF) ============
+function toggle285Hz() {
+  state.hz285 = !state.hz285;
+  updateHz285UI();
+
+  // Aplica el cambio de detune inmediatamente al sourceNode en reproducción
+  if (sourceNode) {
+    sourceNode.detune.value = getTotalDetune();
+  }
+
+  refreshAllDisplays();
+}
+
+function updateHz285UI() {
+  if (state.hz285) {
+    hz285Toggle.classList.add('active');
+    hz285Toggle.setAttribute('aria-checked', 'true');
+    hz285StatusEl.classList.add('on');
+    hz285StatusEl.textContent = t('hz285_on');
+  } else {
+    hz285Toggle.classList.remove('active');
+    hz285Toggle.setAttribute('aria-checked', 'false');
+    hz285StatusEl.classList.remove('on');
+    hz285StatusEl.textContent = t('hz285_off');
+  }
+}
+
+hz285Toggle.addEventListener('click', toggle285Hz);
+hz285Toggle.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+    e.preventDefault();
+    toggle285Hz();
+  }
+});
+
 function updateUI() {
   speedValueEl.textContent = state.speed.toFixed(2) + 'x';
   reverbValueEl.textContent = Math.round(state.reverb * 100) + '%';
   pitchValueEl.textContent = (state.pitch >= 0 ? '+' : '') + state.pitch + ' st';
   hz432ValueEl.textContent = Math.round(state.hz432 * 100) + '%';
+  // Sincroniza el estado visual del toggle 285Hz (sin disparar el evento)
+  updateHz285UI();
 }
 
 // ============ ACTUALIZACIÓN CENTRALIZADA ============
@@ -1764,6 +1952,7 @@ function getEffectSuffix() {
   if (state.reverb > 0.01) parts.push('rev' + Math.round(state.reverb * 100));
   if (state.pitch !== 0) parts.push((state.pitch > 0 ? 'p+' : 'p') + state.pitch);
   if (state.hz432 > 0.01) parts.push('432_' + Math.round(state.hz432 * 100));
+  if (state.hz285) parts.push('285Hz');
   return parts.length ? parts.join('-') : 'original';
 }
 
