@@ -1959,10 +1959,10 @@ function getEffectSuffix() {
 // ============ BOTONES DE EXPORTACIÓN ============
 document.getElementById('exportWav').addEventListener('click', async () => {
   if (!audioBuffer) { showToast(t('err_no_audio'), 'warning'); return; }
-  
-  const wasPlaying = isPlaying;
-  if (wasPlaying) pause();
-  
+
+  // Nota: NO se pausa la reproducción. OfflineAudioContext renderiza en un hilo
+  // independiente del AudioContext en vivo, por lo que el audio sigue sonando
+  // sin interrupciones durante todo el proceso de exportación.
   try {
     showExportProgress(5, t('info_preparing_wav'));
     await new Promise(r => setTimeout(r, 50));
@@ -1979,21 +1979,19 @@ document.getElementById('exportWav').addEventListener('click', async () => {
     showToast(t('err_export', {ext: 'WAV', msg: err.message}), 'error');
     hideExportProgress();
   }
-  
-  if (wasPlaying) play();
 });
 
 document.getElementById('exportMp3').addEventListener('click', async () => {
   if (!audioBuffer) { showToast(t('err_no_audio'), 'warning'); return; }
-  
+
   if (!lamejsReady) {
     showToast(t('err_mp3_ready'), 'error');
     return;
   }
-  
-  const wasPlaying = isPlaying;
-  if (wasPlaying) pause();
-  
+
+  // Nota: NO se pausa la reproducción. OfflineAudioContext renderiza en un hilo
+  // independiente del AudioContext en vivo, por lo que el audio sigue sonando
+  // sin interrupciones durante todo el proceso de exportación.
   try {
     showExportProgress(5, t('info_preparing_mp3'));
     await new Promise(r => setTimeout(r, 50));
@@ -2010,21 +2008,19 @@ document.getElementById('exportMp3').addEventListener('click', async () => {
     showToast(t('err_export', {ext: 'MP3', msg: err.message}), 'error');
     hideExportProgress();
   }
-  
-  if (wasPlaying) play();
 });
 
 document.getElementById('exportOgg').addEventListener('click', async () => {
   if (!audioBuffer) { showToast(t('err_no_audio'), 'warning'); return; }
-  
+
   if (!vorbisEncoderAvailable) {
     showToast(t('err_ogg_unavail'), 'warning');
     return;
   }
-  
-  const wasPlaying = isPlaying;
-  if (wasPlaying) pause();
-  
+
+  // Nota: NO se pausa la reproducción. OfflineAudioContext renderiza en un hilo
+  // independiente del AudioContext en vivo, por lo que el audio sigue sonando
+  // sin interrupciones durante todo el proceso de exportación.
   try {
     showExportProgress(5, t('info_preparing_ogg'));
     await new Promise(r => setTimeout(r, 50));
@@ -2041,8 +2037,6 @@ document.getElementById('exportOgg').addEventListener('click', async () => {
     showToast(t('err_export', {ext: 'OGG', msg: err.message}), 'error');
     hideExportProgress();
   }
-  
-  if (wasPlaying) play();
 });
 
 // ============ UTILS ============
