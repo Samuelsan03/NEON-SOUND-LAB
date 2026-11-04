@@ -1415,6 +1415,13 @@ function seekTo(time) {
   }
   
   pausedAt = time;
+  // FIX: Marcar como "pausado" en la nueva posición aunque no se esté reproduciendo.
+  // Sin esto, cuando el usuario carga el audio (isPaused=false), hace clic en la
+  // onda/barra para moverse y luego pulsa Play, play() ve isPaused=false y ejecuta
+  // sourceNode.start(0, 0), reproducendo desde el inicio en lugar de desde pausedAt.
+  // pause() ya pone isPaused=true cuando wasPlaying, así que esta línea sólo
+  // cambia el estado en el caso !wasPlaying (audio recién cargado o detenido).
+  isPaused = true;
   
   const progress = (pausedAt / audioBuffer.duration) * 100;
   progressFill.style.width = progress + '%';
