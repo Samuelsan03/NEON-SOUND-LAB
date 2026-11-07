@@ -289,13 +289,48 @@ input[type="range"].slider-green::-moz-range-thumb {
 
 .progress-bar {
   background: rgba(255, 255, 255, 0.05);
-  height: 4px; border-radius: 2px; overflow: hidden;
+  height: 6px; border-radius: 3px; overflow: visible;
+  position: relative;
+  cursor: grab;
+  touch-action: none; /* permite arrastre sin scroll del page en móvil */
+  transition: height 0.18s ease;
 }
+.progress-bar:hover, .progress-bar.dragging {
+  height: 10px;
+}
+.progress-bar:active { cursor: grabbing; }
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--neon-pink), var(--neon-cyan));
   box-shadow: 0 0 10px var(--neon-pink);
   transition: width 0.1s linear;
+  border-radius: 3px;
+  pointer-events: none; /* clicks caen en la barra, no en el fill */
+}
+/* Knob/seeker circular en el extremo del fill */
+.progress-bar .progress-knob {
+  position: absolute;
+  top: 50%;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-pink));
+  border: 2px solid #fff;
+  box-shadow: 0 0 12px rgba(0, 245, 255, 0.9), 0 0 4px #fff;
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 2;
+}
+.progress-bar:hover .progress-knob,
+.progress-bar.dragging .progress-knob {
+  transform: translate(-50%, -50%) scale(1);
+}
+/* Área de hit más grande para dedo en móvil (sin afectar visual) */
+.progress-bar::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  top: -10px; bottom: -10px;
 }
 
 .scanline {
@@ -424,8 +459,9 @@ select:focus { border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(0, 245,
         <canvas id="waveformCanvas" style="height: 120px;"></canvas>
         <div id="waveformScan" class="scanline"></div>
       </div>
-      <div class="progress-bar mt-3">
+      <div class="progress-bar mt-3" id="progressBar" role="slider" aria-label="Barra de progreso" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
         <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+        <div class="progress-knob" id="progressKnob" style="left: 0%"></div>
       </div>
     </div>
 
@@ -1096,6 +1132,8 @@ const spectrumCanvas = document.getElementById('spectrumCanvas');
 const waveformScan = document.getElementById('waveformScan');
 const currentTimeEl = document.getElementById('currentTime');
 const progressFill = document.getElementById('progressFill');
+const progressBar = document.getElementById('progressBar');
+const progressKnob = document.getElementById('progressKnob');
 const recordingDot = document.getElementById('recordingDot');
 const statusText = document.getElementById('statusText');
 const outputInfo = document.getElementById('outputInfo');
@@ -1507,6 +1545,8 @@ function stopPlayback() {
   waveformScan.classList.remove('active');
   
   progressFill.style.width = '0%';
+  if (progressKnob) progressKnob.style.left = '0%';
+  if (progressBar) progressBar.setAttribute('aria-valuenow', '0');
   currentTimeEl.textContent = '0:00 / ' + formatTime(audioBuffer ? audioBuffer.duration : 0);
 
   cancelAnimationFrame(animationFrame);
@@ -1522,31 +1562,143 @@ playBtn.addEventListener('click', () => {
 });
 stopBtn.addEventListener('click', stopPlayback);
 
-// ============ SEEK EN WAVEFORM ============
-let isDraggingWaveform = false;
+// ============ SEEK EN WAVEFORM + BARRA DE PROGRESO ============
+// Variables de arrastre. Mientras isDraggingSeek=true, SOLO se actualiza la UI
+// visualmente (barra/knob/tiempo/scanline) sin recrear el BufferSource — esto
+// evita los clicks/glitches audibles que aparecerían si recreáramos el source
+// en cada mousemove/touchmove (decenas por segundo). El seek real (pause+play)
+// se hace UNA sola vez al soltar (mouseup/touchend).
+let isDraggingSeek = false;
+let wasPlayingBeforeDrag = false;
 
-waveformCanvas.addEventListener('mousedown', (e) => {
-  if (!audioBuffer) return;
-  isDraggingWaveform = true;
-  seekFromEvent(e);
-});
-
-window.addEventListener('mousemove', (e) => {
-  if (isDraggingWaveform) seekFromEvent(e);
-});
-
-window.addEventListener('mouseup', () => {
-  isDraggingWaveform = false;
-});
-
-function seekFromEvent(e) {
-  const rect = waveformCanvas.getBoundingClientRect();
-  let x = e.clientX - rect.left;
+// Devuelve la posición X relativa (0..1) a partir de un evento mouse o touch,
+// medida dentro del bounding box del elemento indicado.
+function getRelativeX(el, e) {
+  const rect = el.getBoundingClientRect();
+  // Soporta tanto MouseEvent como TouchEvent (uno o varios dedos)
+  const clientX = (e.touches && e.touches.length > 0)
+    ? e.touches[0].clientX
+    : (e.changedTouches && e.changedTouches.length > 0)
+      ? e.changedTouches[0].clientX
+      : e.clientX;
+  let x = clientX - rect.left;
   x = Math.max(0, Math.min(rect.width, x));
-  const percent = x / rect.width;
-  seekTo(percent * audioBuffer.duration);
+  return rect.width > 0 ? x / rect.width : 0;
 }
 
+// Actualiza SOLO la UI (sin tocar el sourceNode). Se llama durante el arrastre.
+function updateSeekVisual(time) {
+  if (!audioBuffer) return;
+  time = Math.max(0, Math.min(audioBuffer.duration, time));
+  pausedAt = time;
+  isPaused = true;
+  const progress = (pausedAt / audioBuffer.duration) * 100;
+  progressFill.style.width = progress + '%';
+  if (progressKnob) progressKnob.style.left = progress + '%';
+  if (progressBar) progressBar.setAttribute('aria-valuenow', Math.round(progress));
+  currentTimeEl.textContent = formatTime(pausedAt) + ' / ' + formatTime(audioBuffer.duration);
+  waveformScan.style.left = progress + '%';
+}
+
+// Inicia el arrastre: pausa el audio una sola vez si está reproduciendo.
+function startSeekDrag(el, e) {
+  if (!audioBuffer) return;
+  isDraggingSeek = true;
+  progressBar.classList.add('dragging');
+  // Recuerda si estaba reproduciendo para retomarlo al soltar
+  wasPlayingBeforeDrag = isPlaying;
+  if (wasPlayingBeforeDrag) {
+    pause(); // una sola pausa — silencio limpio durante el arrastre
+  }
+  // Salta a la posición inicial del arrastre (también sólo visual)
+  updateSeekVisual(getRelativeX(el, e) * audioBuffer.duration);
+}
+
+// Durante el arrastre: solo mueve la UI, sin tocar el audio.
+function moveSeekDrag(el, e) {
+  if (!isDraggingSeek || !audioBuffer) return;
+  updateSeekVisual(getRelativeX(el, e) * audioBuffer.duration);
+}
+
+// Al soltar: hace el seek real una sola vez y retoma la reproducción si estaba sonando.
+function endSeekDrag() {
+  if (!isDraggingSeek) return;
+  isDraggingSeek = false;
+  progressBar.classList.remove('dragging');
+  // Commit del seek: si estaba reproduciendo, play() crea el source desde pausedAt
+  if (wasPlayingBeforeDrag && audioBuffer) {
+    play();
+  }
+  wasPlayingBeforeDrag = false;
+}
+
+// --- WAVEFORM (mouse) ---
+waveformCanvas.addEventListener('mousedown', (e) => {
+  startSeekDrag(waveformCanvas, e);
+});
+window.addEventListener('mousemove', (e) => {
+  if (isDraggingSeek) moveSeekDrag(waveformCanvas, e);
+});
+window.addEventListener('mouseup', endSeekDrag);
+
+// --- WAVEFORM (touch / móvil) ---
+waveformCanvas.addEventListener('touchstart', (e) => {
+  startSeekDrag(waveformCanvas, e);
+  e.preventDefault();
+}, { passive: false });
+waveformCanvas.addEventListener('touchmove', (e) => {
+  if (isDraggingSeek) {
+    moveSeekDrag(waveformCanvas, e);
+    e.preventDefault(); // evita el scroll del page al arrastrar
+  }
+}, { passive: false });
+waveformCanvas.addEventListener('touchend', endSeekDrag);
+waveformCanvas.addEventListener('touchcancel', endSeekDrag);
+
+// --- BARRA DE PROGRESO (mouse) ---
+progressBar.addEventListener('mousedown', (e) => {
+  startSeekDrag(progressBar, e);
+});
+// mousemove y mouseup ya están registrados arriba (usan isDraggingSeek unificado)
+
+// --- BARRA DE PROGRESO (touch / móvil) ---
+progressBar.addEventListener('touchstart', (e) => {
+  startSeekDrag(progressBar, e);
+  e.preventDefault();
+}, { passive: false });
+progressBar.addEventListener('touchmove', (e) => {
+  if (isDraggingSeek) {
+    moveSeekDrag(progressBar, e);
+    e.preventDefault();
+  }
+}, { passive: false });
+progressBar.addEventListener('touchend', endSeekDrag);
+progressBar.addEventListener('touchcancel', endSeekDrag);
+
+// --- BARRA DE PROGRESO (teclado: flechas izq/der) ---
+// Estos sí son seeks discretos (un solo salto), así que llaman a seekTo() que
+// recrea el source UNA vez — sin glitch porque es una sola transición.
+progressBar.addEventListener('keydown', (e) => {
+  if (!audioBuffer) return;
+  const step = 5; // segundos por pulsación
+  if (e.key === 'ArrowLeft') {
+    seekTo(Math.max(0, getCurrentPlaybackTime() - step));
+    e.preventDefault();
+  } else if (e.key === 'ArrowRight') {
+    seekTo(Math.min(audioBuffer.duration, getCurrentPlaybackTime() + step));
+    e.preventDefault();
+  } else if (e.key === 'Home') {
+    seekTo(0);
+    e.preventDefault();
+  } else if (e.key === 'End') {
+    seekTo(audioBuffer.duration);
+    e.preventDefault();
+  }
+});
+
+// seekTo: seek discreto (teclado, Media Session, preset). Recrea el source
+// una sola vez. NO se usa durante el arrastre del waveform/barra — ahí se usa
+// updateSeekVisual + endSeekDrag para evitar clicks.
 function seekTo(time) {
   if (!audioBuffer) return;
   time = Math.max(0, Math.min(audioBuffer.duration, time));
@@ -1567,6 +1719,8 @@ function seekTo(time) {
   
   const progress = (pausedAt / audioBuffer.duration) * 100;
   progressFill.style.width = progress + '%';
+  if (progressKnob) progressKnob.style.left = progress + '%';
+  if (progressBar) progressBar.setAttribute('aria-valuenow', Math.round(progress));
   currentTimeEl.textContent = formatTime(pausedAt) + ' / ' + formatTime(audioBuffer.duration);
   waveformScan.style.left = progress + '%';
 
@@ -1713,6 +1867,8 @@ function animateVisualizer() {
   const duration = audioBuffer.duration;
   const progress = Math.min(100, (elapsed / duration) * 100);
   progressFill.style.width = progress + '%';
+  if (progressKnob) progressKnob.style.left = progress + '%';
+  if (progressBar) progressBar.setAttribute('aria-valuenow', Math.round(progress));
   currentTimeEl.textContent = formatTime(Math.min(elapsed, duration)) + ' / ' + formatTime(duration);
   waveformScan.style.left = progress + '%';
 
