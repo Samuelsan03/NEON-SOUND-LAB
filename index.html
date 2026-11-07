@@ -1204,6 +1204,7 @@ async function loadFile(file) {
     });
     
     updateOutputInfo();
+    setupMediaSession();
     showToast(t('info_loaded'), 'success');
   } catch (err) {
     console.error(err);
@@ -1302,6 +1303,136 @@ function updateOutputInfo() {
   outputInfo.textContent = parts.join(' · ');
 }
 
+// ============ MEDIA SESSION (Notificación móvil / segundo plano) ============
+// Permite que aparezca la notificación de audio del sistema cuando el usuario
+// sale de la app pero deja el navegador en segundo plano. Funciona en
+// Chrome/Edge/Brave/Firefox para Android. iOS Safari lo muestra mientras el
+// tab está activo; para audio en segundo plano real en iOS se necesitaría un
+// elemento <audio> HTML (limitación de Web Audio API en iOS).
+let mediaSessionArtwork = null;
+
+function generateArtworkDataURI() {
+  // Genera una carátula 512x512 con gradiente neon y "NSL" — todo en local
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    const grad = ctx.createLinearGradient(0, 0, 512, 512);
+    grad.addColorStop(0, '#ff006e');
+    grad.addColorStop(0.5, '#8338ec');
+    grad.addColorStop(1, '#00f5ff');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Cuadrícula sutil estilo cyber
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 512; i += 32) {
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 512); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(512, i); ctx.stroke();
+    }
+
+    // Logo NSL con glow neon
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 180px "Audiowide", "Space Grotesk", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,245,255,0.9)';
+    ctx.shadowBlur = 28;
+    ctx.fillText('NSL', 256, 256);
+    ctx.shadowBlur = 0;
+
+    return canvas.toDataURL('image/png');
+  } catch (e) {
+    return null;
+  }
+}
+
+function getCurrentPlaybackTime() {
+  if (!audioBuffer) return 0;
+  if (isPlaying && !isPaused && audioContext) {
+    return Math.min(audioBuffer.duration, (audioContext.currentTime - startTime) * state.speed);
+  }
+  return pausedAt || 0;
+}
+
+function setupMediaSession() {
+  if (!('mediaSession' in navigator)) return;
+
+  if (!mediaSessionArtwork) {
+    mediaSessionArtwork = generateArtworkDataURI();
+  }
+
+  const filenameEl = document.getElementById('fileName');
+  const filename = filenameEl ? filenameEl.textContent : 'Audio';
+
+  const artwork = [];
+  if (mediaSessionArtwork) {
+    artwork.push({ src: mediaSessionArtwork, sizes: '512x512', type: 'image/png' });
+  }
+
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: filename.replace(/\.[^/.]+$/, ''),
+      artist: 'NEON SOUND LAB',
+      album: 'Web Audio · 100% Local',
+      artwork: artwork
+    });
+  } catch (e) {
+    return;
+  }
+
+  // Handlers: disparados por los botones de la notificación del SO
+  const trySet = (action, fn) => {
+    try { navigator.mediaSession.setActionHandler(action, fn); }
+    catch (e) { /* acción no soportada en este navegador */ }
+  };
+
+  trySet('play', () => { play(); });
+  trySet('pause', () => { pause(); });
+  trySet('stop', () => { stopPlayback(); });
+  trySet('seekto', (details) => {
+    if (details && details.seekTime != null) seekTo(details.seekTime);
+  });
+  trySet('seekbackward', (details) => {
+    const offset = (details && details.seekOffset) || 10;
+    seekTo(Math.max(0, getCurrentPlaybackTime() - offset));
+  });
+  trySet('seekforward', (details) => {
+    const offset = (details && details.seekOffset) || 10;
+    seekTo(Math.min(audioBuffer.duration, getCurrentPlaybackTime() + offset));
+  });
+
+  updateMediaSessionState('paused');
+  updateMediaPositionState();
+}
+
+function updateMediaSessionState(stateName) {
+  // stateName: 'playing' | 'paused' | 'none'
+  if (!('mediaSession' in navigator)) return;
+  try { navigator.mediaSession.playbackState = stateName; } catch (e) {}
+}
+
+function updateMediaPositionState() {
+  if (!('mediaSession' in navigator) || !audioBuffer) return;
+  if (typeof navigator.mediaSession.setPositionState !== 'function') return;
+  try {
+    const outDuration = audioBuffer.duration / state.speed;
+    const duration = isFinite(outDuration) && outDuration > 0 ? outDuration : 0;
+    const position = Math.max(0, Math.min(getCurrentPlaybackTime(), duration || Infinity));
+    if (duration <= 0) return;
+    navigator.mediaSession.setPositionState({
+      duration: duration,
+      position: position,
+      playbackRate: state.speed || 1
+    });
+  } catch (e) {
+    // setPositionState puede fallar si duration es Infinity o position > duration
+  }
+}
+
 // ============ PLAYBACK ============
 function play() {
   if (!audioBuffer) return;
@@ -1324,7 +1455,11 @@ function play() {
   statusText.textContent = t('status_playing');
   statusText.className = 'text-pink-300 text-xs';
   waveformScan.classList.add('active');
-  
+
+  // Notificación móvil: estado reproduciendo + posición actual
+  updateMediaSessionState('playing');
+  updateMediaPositionState();
+
   animateVisualizer();
 }
 
@@ -1346,7 +1481,11 @@ function pause() {
   statusText.textContent = t('status_paused');
   statusText.className = 'text-cyan-300 text-xs';
   waveformScan.classList.remove('active');
-  
+
+  // Notificación móvil: estado pausado + posición actual
+  updateMediaSessionState('paused');
+  updateMediaPositionState();
+
   cancelAnimationFrame(animationFrame);
 }
 
@@ -1369,9 +1508,12 @@ function stopPlayback() {
   
   progressFill.style.width = '0%';
   currentTimeEl.textContent = '0:00 / ' + formatTime(audioBuffer ? audioBuffer.duration : 0);
-  
+
   cancelAnimationFrame(animationFrame);
   drawSpectrumIdle();
+
+  // Notificación móvil: estado none (la notificación desaparece)
+  updateMediaSessionState('none');
 }
 
 playBtn.addEventListener('click', () => {
@@ -1427,6 +1569,9 @@ function seekTo(time) {
   progressFill.style.width = progress + '%';
   currentTimeEl.textContent = formatTime(pausedAt) + ' / ' + formatTime(audioBuffer.duration);
   waveformScan.style.left = progress + '%';
+
+  // Notificación móvil: actualiza la posición mostrada en la barra del SO
+  updateMediaPositionState();
   
   if (wasPlaying) {
     play();
@@ -1570,7 +1715,13 @@ function animateVisualizer() {
   progressFill.style.width = progress + '%';
   currentTimeEl.textContent = formatTime(Math.min(elapsed, duration)) + ' / ' + formatTime(duration);
   waveformScan.style.left = progress + '%';
-  
+
+  // Actualiza la posición de la notificación ~1 vez/seg (no en cada frame)
+  if (!animateVisualizer._lastPosUpdate || (elapsed - animateVisualizer._lastPosUpdate) >= 1) {
+    animateVisualizer._lastPosUpdate = elapsed;
+    updateMediaPositionState();
+  }
+
   if (elapsed >= duration) {
     stopPlayback();
     return;
